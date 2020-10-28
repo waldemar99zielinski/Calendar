@@ -1,16 +1,19 @@
+#!/usr/bin/perl
 use strict;
 use warnings;
 use diagnostics;
 
 use Time::Piece;
-
+use Time::Seconds;
 use feature 'say';
 
 use feature "switch";
 
 use lib 'lib';
 use Event;
-use Time::Seconds;
+use CalendarDay;
+use LaTeXDocument;
+
 
 =put
 # The original date as a string
@@ -53,7 +56,7 @@ sub getArrayEventsFromNotes{
 
         #print "Data: $date, opis: $desc\n";
     }
-
+    #sort events by date 
     my @sorted_events = sort {$a->{date}->strftime("%Y.%m.%d") cmp $b->{date}->strftime("%Y.%m.%d")} @events;
 
     return @sorted_events;
@@ -90,7 +93,7 @@ printf "Day of the week %d \n",$date2->_wday ;
 print $date2->wdayname;
 =cut
 #arguments (initial date, weeks)
-sub getArrayOfDates{
+sub getArrayOfDatesForWeeks{
     my $initial_date = Time::Piece->strptime($_[0], '%Y.%m.%d');
     my $number_of_weeks = $_[1];
     my $current_date = $initial_date;
@@ -115,8 +118,38 @@ sub getArrayOfDates{
     return @days;
 
 }
+sub getArrayOfDatesForMonths{
+    my $initial_date = Time::Piece->strptime($_[0], '%Y.%m.%d');
+    my $numberOfMonths = $_[1];
+
+    my $month = $initial_date->mon;
+    my $year = $initial_date->year;
+
+    my $firstDayOfTheMonth = Time::Piece->strptime("".$year.".".$month."."."01", '%Y.%m.%d');
+
+    my $currentDate = $firstDayOfTheMonth;
+   
+    my @days;
+   
+    my $monthsCounter = 0;
+    while($monthsCounter<$numberOfMonths){
+        push(@days, $currentDate);
+        my $nextDate = $currentDate + ONE_DAY;
+      
+        if($currentDate->mon != $nextDate->mon){
+            $monthsCounter++;
+        }
+        $currentDate = $nextDate;
+    }
+   
+    return @days;
+
+}
+
 my @events = getArrayEventsFromNotes();
-my @dates = getArrayOfDates("2013.02.07", 2);
+#my @dates = getArrayOfDates("2013.02.07", 6);
+my @dates = getArrayOfDatesForMonths("2020.10.15", 4);
+my @calendarDays;
 
 #arguments (\dates, \events) passing arrays as a reference
 sub datesAndEvents{
@@ -126,24 +159,40 @@ sub datesAndEvents{
     my $event = shift @events;
     my $date = shift @dates;
 
+    my $singleCalendarDate = new CalendarDay($date);
+
     while($date && $event){
-        #print("event: ",$event->getDate(), "\n");
-        #print("date: ",$date, "\n");
+        
+
         if($date == $event->getDate()){
             #print("match\n");
-            print($date, " ", $event->getDescription(), "\n");
+            #print($date, " ", $event->getDescription(), "\n");
+            
+            #add desc event to calendar day
+            my @descArray = $singleCalendarDate->getEventsDesc();
+            push(@descArray, $event->getDescription());
+            $singleCalendarDate->setEventsDesc(@descArray);
+
             $event = shift @events;
         }elsif($date > $event->getDate()){
             $event = shift @events;
         }else{
-            print($date, "\n");
+            #print($date, "\n");
+
+            push(@calendarDays, $singleCalendarDate);
+
             $date = shift @dates;
+            $singleCalendarDate = new CalendarDay($date);
         }
         
     }
     while($date){
-        print($date, "\n");
+        #print($date, "\n");
+        
+        push(@calendarDays, $singleCalendarDate);
+
         $date = shift @dates;
+        $singleCalendarDate = new CalendarDay($date);
     }
 
 }
@@ -151,3 +200,22 @@ sub datesAndEvents{
 #print("@dates \n");
 #passing arrays as a reference
 datesAndEvents(\@dates, \@events);
+=put
+foreach my $day (@calendarDays){
+    print $day->getDate()->strftime("%Y.%m.%d");
+ 
+
+    foreach my $path ($day->getEventsDesc ) {
+        print $path, " | ";
+    }
+       print "\n";
+} 
+=cut
+
+open(FH, '>', "cal.tex") or die $!;
+
+print FH getTeXDocument(\@calendarDays);
+
+close(FH);
+#print(getTeXDocument(\@calendarDays));
+
