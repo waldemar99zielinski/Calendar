@@ -1,34 +1,37 @@
-package LaTeXDocument;
+package RoffDocument;
 
 use strict;
 use warnings;
-use diagnostics;
+
+use Time::Piece;
 
 use Event;
 use CalendarDay;
 use Time::Seconds;
 
-
-#arguments ($dayOfTheMonth, @events)
-sub getTeXDay{
+sub getTBLDay{
     my $dayOfTheMonth = $_[0];
     my @events = @{$_[1]};
-
+    my $eventsText = "";
     #TeX formated day
-    my $day;
+
     #add date
-    $day = "{\\large $dayOfTheMonth}";
+    
     #add events
     foreach my $event (@events){
-        my $eventDesc = "\\newline {\\small -$event}";
-        $day = $day.$eventDesc;
+   
+        $eventsText = $eventsText."\n\n-$event"; 
     }
+        my $day=
+"T{
+$dayOfTheMonth $eventsText
+T}";
     return $day;
 }
 
 
 #arguments(@caledarDaysArray), should contain dates for only one month
-sub getTable{
+sub getTBLTable{
     my @caledarDaysArray = @{$_[0]};
     my $month = $caledarDaysArray[0]->getDate()->fullmonth." ".$caledarDaysArray[0]->getDate()->year;
     my $week = "";
@@ -39,63 +42,62 @@ sub getTable{
     for(my $i = 0; $i<$dayOfTheWeekForTheFirstDay; $i++){
      
         $week = $week.$empytDay;
-        #print ("alignment: ",$currentDayOfTheWeek, " ", $week, "\n");
+        
         $currentDayOfTheWeek++;
         
     }
 
     foreach my $day(@caledarDaysArray){
+        
         if($currentDayOfTheWeek<6){
           
             my @descArray = $day->getEventsDesc();
-            $week = $week.getTeXDay($day->getDate()->mday, \@descArray);
+            $week = $week.getTBLDay($day->getDate()->mday, \@descArray);
             $week = $week."&";
-            #print ("week: ",$currentDayOfTheWeek, " ", $week, "\n");
+        
             $currentDayOfTheWeek++;
             
-        }else{
+        }else{#end table line
             
             my @descArray = $day->getEventsDesc();
-            $week = $week.getTeXDay($day->getDate()->mday, \@descArray);
-            $week = $week."\\\\ \\hline \n";
-            #print ("endweek: ",$currentDayOfTheWeek, " ", $week, "\n");
+            $week = $week.getTBLDay($day->getDate()->mday, \@descArray);
+            $week = $week."\n";
+          
             $currentDayOfTheWeek = 0;
         }
     }
+    
     if($currentDayOfTheWeek != 0){
+        #pupulate table with empy cells
         while($currentDayOfTheWeek<6){
             $week = $week.$empytDay;
             $currentDayOfTheWeek++;
         }    
-        $week = $week."\\\\ \\hline \n";
+       
+    }else{
+        #delete last new line
+        $week = substr($week, 0, (length $week)-1);
     }
     
     
     
-    my $table = "\\begin{table}[t]
-
-\\centering
-    
-\\renewcommand{\\arraystretch}{1.5}
-\\begin{tabular}{|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|} 
-\\hline
-\\multicolumn{7}{|c|}{\\textbf{$month}}\\\\
-\\hline
-\\textbf{Sun} & \\textbf{Mon} & \\textbf{Tue} &\\textbf{Wed}  &\\textbf{Thu}  &\\textbf{Fri}  &\\textbf{Sat} \\\\ 
-
-\\hline
-    
+    my $table = 
+".TS
+center allbox tab(&);
+cB s s s s s s
+cw(0.7i)B cw(0.7i)B cw(0.7i)B cw(0.7i)B cw(0.7i)B cw(0.7i)B cw(0.7i)B
+lw(0.7i) lw(0.7i) lw(0.7i) lw(0.7i) lw(0.7i) lw(0.7i) lw(0.7i).
+$month
+Sun & Mon & Tue & Wed & Thu & Fri & Sat
 $week
-\\end{tabular}
-\\end{table} 
+.TE
 ";
     return $table;
 }
-
 #arguments(@cacaledarDaysArray)
-sub getTeXDocument{
+sub getTBLDocument{
     my @caledarDaysArray = @{$_[0]};
-    my $tables = "";
+    my $tables = "\n";
     my $currentMonth = $caledarDaysArray[0]->getDate()->mon;
 
     my @calendarDaysForOneMonth;
@@ -107,7 +109,8 @@ sub getTeXDocument{
          
             #print($day->getDate(), "\n");
         }else{
-            $tables = $tables.getTable(\@calendarDaysForOneMonth);
+            #
+            $tables = $tables.getTBLTable(\@calendarDaysForOneMonth)."\n";
             @calendarDaysForOneMonth = ();
             push(@calendarDaysForOneMonth, $day);
             $currentMonth = $day->getDate()->mon;
@@ -117,23 +120,11 @@ sub getTeXDocument{
        
     } 
 
-    $tables = $tables.getTable(\@calendarDaysForOneMonth);
+    $tables = $tables.getTBLTable(\@calendarDaysForOneMonth);
 
     
-    my $document = "\\documentclass{article}
-\\usepackage[utf8]{inputenc}
-\\usepackage{array}
-\\usepackage[a4paper, total={6in, 8in}]{geometry}
-\\pagestyle{empty}
-\\title{Calendar}
-\\begin{document}
-
-$tables
-
-\\end{document}
-";
-
-    return $document;
+   
+    return $tables;
 }
 
 1;

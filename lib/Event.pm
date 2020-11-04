@@ -17,7 +17,7 @@ sub new{
 }
 sub getDate {
     my ($self) = @_;
-    return $self->{date};#->strftime("%Y.%m.%d");
+    return $self->{date};
 }
 sub getDateFormated {
     my ($self) = @_;
